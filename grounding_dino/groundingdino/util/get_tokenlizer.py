@@ -3,7 +3,14 @@ import os
 
 def get_tokenlizer(text_encoder_type):
     if text_encoder_type == "bert-base-uncased":
-        bert_base_uncased_path = "./bert"
+        # bert_base_uncased_path = "../../../bert"
+        project_name = 'Grounded-SAM-2'
+        parts = os.path.abspath(__file__).split(os.sep)
+        project_index = parts.index(project_name)
+        project_root = os.sep.join(parts[:project_index + 1])
+        bert_base_uncased_path = os.path.join(project_root, "bert")
+        # print("bert_base_uncased_path: {}".format(bert_base_uncased_path))
+
         return AutoTokenizer.from_pretrained(bert_base_uncased_path)
 
     if not isinstance(text_encoder_type, str):
@@ -26,7 +33,13 @@ def get_tokenlizer(text_encoder_type):
 
 def get_pretrained_language_model(text_encoder_type):
     if text_encoder_type == "bert-base-uncased" or (os.path.isdir(text_encoder_type) and os.path.exists(text_encoder_type)):
-        bert_base_uncased_path = "./bert"
+        project_name = 'Grounded-SAM-2'
+        parts = os.path.abspath(__file__).split(os.sep)
+        project_index = parts.index(project_name)
+        project_root = os.sep.join(parts[:project_index + 1])
+        bert_base_uncased_path = os.path.join(project_root, "bert")
+        # print("bert_base_uncased_path: {}".format(bert_base_uncased_path))
+
         return BertModel.from_pretrained(bert_base_uncased_path)
 
     if text_encoder_type == "roberta-base":
