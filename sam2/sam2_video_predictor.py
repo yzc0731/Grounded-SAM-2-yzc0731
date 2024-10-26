@@ -114,11 +114,12 @@ class SAM2VideoPredictor(SAM2Base):
     def init_state_with_image(
         self, 
         images,
-        ori_image_shape,
+        max_len=1,
         offload_video_to_cpu=False,
         offload_state_to_cpu=False,
         async_loading_frames=False,
     ):
+        image_container = torch.zeros([max_len, 3, 1024, 1024], device=self.device)
         # convert the images into torch tensor if it is a numpy array
         if isinstance(images, np.ndarray):
             images = torch.tensor(images, dtype=torch.float32) # (h, w, c)
@@ -136,7 +137,10 @@ class SAM2VideoPredictor(SAM2Base):
         img_std = torch.tensor((0.229, 0.224, 0.225), dtype=torch.float32, device=images.device).view(3, 1, 1)
         images = (images - img_mean) / img_std
 
-        inference_state["images"] = images
+        images = images.squeeze(0)
+        image_container[0] = images
+
+        inference_state["images"] = image_container # (800, c, h, w)
         inference_state["num_frames"] = len_images # len_images = 1
         # whether to offload the video frames to CPU memory
         # turning on this option saves the GPU memory with only a very small overhead
@@ -147,8 +151,8 @@ class SAM2VideoPredictor(SAM2Base):
         # and from 24 to 21 when tracking two objects)
         inference_state["offload_state_to_cpu"] = offload_state_to_cpu
         # the original video height and width, used for resizing final output scores
-        inference_state["video_height"] = ori_image_shape[0]
-        inference_state["video_width"] = ori_image_shape[1]
+        inference_state["video_height"] = video_height
+        inference_state["video_width"] = video_width
 
         inference_state["device"] = compute_device
         if offload_state_to_cpu:
@@ -210,10 +214,9 @@ class SAM2VideoPredictor(SAM2Base):
         img_std = torch.tensor((0.229, 0.224, 0.225), dtype=torch.float32, device=images.device).view(3, 1, 1)
         images = (images - img_mean) / img_std
 
-        original_images = inference_state["images"]
-        new_images = torch.concat([original_images, images], dim=0) # (len_images, c, h, w)
-        inference_state["images"] = new_images
-        inference_state["num_frames"] = len(new_images)
+        len = inference_state["num_frames"]
+        inference_state["images"][len] = images.squeeze(0)
+        inference_state["num_frames"] = len + 1
         return inference_state
 
     @classmethod
