@@ -122,8 +122,7 @@ class SAM2VideoPredictor(SAM2Base):
         image_container = torch.zeros([max_len, 3, 1024, 1024], device=self.device)
         # convert the images into torch tensor if it is a numpy array
         if isinstance(images, np.ndarray):
-            images = torch.tensor(images, dtype=torch.float32) # (h, w, c)
-        # reshape the images into (1, c, h, w)
+            images = torch.tensor(images, dtype=torch.float32, device=self.device) # (h, w, c)
         images = images.unsqueeze(0).permute(0, 3, 1, 2) # (1, c, h, w)
         len_images, c, video_height, video_width = images.shape
 
@@ -205,8 +204,7 @@ class SAM2VideoPredictor(SAM2Base):
     ):
         # convert the images into torch tensor if it is a numpy array
         if isinstance(images, np.ndarray):
-            images = torch.tensor(images, dtype=torch.float32)
-        # reshape it to (1, c, h, w)
+            images = torch.tensor(images, dtype=torch.float32, device=self.device) # (h, w, c)
         images = images.unsqueeze(0).permute(0, 3, 1, 2) # (1, c, h, w)
         
         images = images / 255.0
@@ -440,7 +438,7 @@ class SAM2VideoPredictor(SAM2Base):
         mask_inputs_per_frame = inference_state["mask_inputs_per_obj"][obj_idx]
 
         if not isinstance(mask, torch.Tensor):
-            mask = torch.tensor(mask, dtype=torch.bool)
+            mask = torch.tensor(mask, dtype=torch.bool, device=self.device)
         assert mask.dim() == 2, f"mask must be 2D, but got shape {mask.shape}"
         mask_H, mask_W = mask.shape
         mask_inputs_orig = mask[None, None]  # add batch and channel dimension
@@ -1084,10 +1082,11 @@ class SAM2VideoPredictor(SAM2Base):
             maskmem_features = maskmem_features.to(storage_device, non_blocking=True)
         pred_masks_gpu = current_out["pred_masks"]
         # potentially fill holes in the predicted masks
-        if self.fill_hole_area > 0:
-            pred_masks_gpu = fill_holes_in_mask_scores(
-                pred_masks_gpu, self.fill_hole_area
-            )
+        # if self.fill_hole_area > 0:
+        #     pred_masks_gpu = fill_holes_in_mask_scores(
+        #         pred_masks_gpu, self.fill_hole_area
+        #     )
+        
         pred_masks = pred_masks_gpu.to(storage_device, non_blocking=True)
         # "maskmem_pos_enc" is the same across frames, so we only need to store one copy of it
         maskmem_pos_enc = self._get_maskmem_pos_enc(inference_state, current_out)
