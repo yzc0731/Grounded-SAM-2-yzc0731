@@ -20,25 +20,28 @@ GROUNDING_DINO_CONFIG = "grounding_dino/groundingdino/config/GroundingDINO_SwinT
 GROUNDING_DINO_CHECKPOINT = "gdino_checkpoints/groundingdino_swint_ogc.pth"
 BOX_THRESHOLD = 0.35
 TEXT_THRESHOLD = 0.25
-# VIDEO_PATH = "./assets/agentview_demo_0.mp4"
-VIDEO_PATH = "/cache/yzc/atm_latest/data/libero/libero_test/Panda_test_sam2/videos/agentview_demo_0.mp4"
-TEXT_PROMPT = "butter."
-OUTPUT_VIDEO_PATH = "./tracking_demo.mp4"
+VIDEO_PATH = "data/Wed_Oct_15_15_39_53_2025/recordings/MP4/28579662_left.mp4"
+TEXT_PROMPT = "end effector"
+OUTPUT_VIDEO_PATH = VIDEO_PATH.replace(".mp4", "_tracking_robot.mp4")
 SOURCE_VIDEO_FRAME_DIR = "./custom_video_frames"
 SAVE_TRACKING_RESULTS_DIR = "./tracking_results"
 PROMPT_TYPE_FOR_VIDEO = "mask" # choose from ["point", "box", "mask"]
 DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
-BOX_NUM_ANCHOR = 4
+BOX_NUM_ANCHOR = 1
 
 """
 Step 1: Environment settings and model initialization for Grounding DINO and SAM 2
 """
+debug_tmp = True
 # build grounding dino model from local path
-grounding_model = load_model(
-    model_config_path=GROUNDING_DINO_CONFIG, 
-    model_checkpoint_path=GROUNDING_DINO_CHECKPOINT,
-    device=DEVICE
-)
+if debug_tmp:
+    pass
+else:
+    grounding_model = load_model(
+        model_config_path=GROUNDING_DINO_CONFIG, 
+        model_checkpoint_path=GROUNDING_DINO_CHECKPOINT,
+        device=DEVICE
+    )
 
 
 # init sam image predictor and video predictor model
@@ -54,7 +57,7 @@ image_predictor = SAM2ImagePredictor(sam2_image_model)
 Custom video input directly using video files
 """
 video_info = sv.VideoInfo.from_video_path(VIDEO_PATH)  # get video info
-print(video_info)
+# print(video_info)
 frame_generator = sv.get_video_frames_generator(VIDEO_PATH, stride=1, start=0, end=None)
 
 # saving video to frames
@@ -88,31 +91,31 @@ Step 2: Prompt Grounding DINO 1.5 with Cloud API for box coordinates
 img_path = os.path.join(SOURCE_VIDEO_FRAME_DIR, frame_names[ann_frame_idx])
 image_source, image = load_image(img_path)
 
-boxes, confidences, labels = predict(
-    model=grounding_model,
-    image=image,
-    caption=TEXT_PROMPT,
-    box_threshold=BOX_THRESHOLD,
-    text_threshold=TEXT_THRESHOLD,
-    box_num_anchor=BOX_NUM_ANCHOR,
-)
+if debug_tmp:
+    pass
+else:
+    boxes, confidences, labels = predict(
+        model=grounding_model,
+        image=image,
+        caption=TEXT_PROMPT,
+        box_threshold=BOX_THRESHOLD,
+        text_threshold=TEXT_THRESHOLD,
+        box_num_anchor=BOX_NUM_ANCHOR,
+    )
 
-# process the box prompt for SAM 2
-h, w, _ = image_source.shape
-boxes = boxes * torch.Tensor([w, h, w, h])
-input_boxes = box_convert(boxes=boxes, in_fmt="cxcywh", out_fmt="xyxy").numpy()
-confidences = confidences.numpy().tolist()
-class_names = labels
-
-print(input_boxes)
+    # process the box prompt for SAM 2
+    h, w, _ = image_source.shape
+    boxes = boxes * torch.Tensor([w, h, w, h])
+    input_boxes = box_convert(boxes=boxes, in_fmt="cxcywh", out_fmt="xyxy").numpy()
+    confidences = confidences.numpy().tolist()
+    class_names = labels
+    OBJECTS = class_names
+    # print(OBJECTS)
+    # print(input_boxes)
 
 # prompt SAM image predictor to get the mask for the object
 image_predictor.set_image(image_source)
 
-# process the detection results
-OBJECTS = class_names
-
-print(OBJECTS)
 
 # FIXME: figure how does this influence the G-DINO model
 torch.autocast(device_type=DEVICE, dtype=torch.bfloat16).__enter__()
@@ -122,13 +125,24 @@ if torch.cuda.get_device_properties(0).major >= 8:
     torch.backends.cuda.matmul.allow_tf32 = True
     torch.backends.cudnn.allow_tf32 = True
 
+default_point_coord = [833, 127]
 # prompt SAM 2 image predictor to get the mask for the object
-masks, scores, logits = image_predictor.predict(
-    point_coords=None,
-    point_labels=None,
-    box=input_boxes,
-    multimask_output=False,
-)
+if debug_tmp:
+    point = np.array(default_point_coord)[None, :] # (1, 2)
+    masks, scores, logits = image_predictor.predict(
+        point_coords=point,
+        point_labels=np.array([1]),
+        box=None,
+        multimask_output=False,
+    )
+    OBJECTS = [TEXT_PROMPT]
+else:
+    masks, scores, logits = image_predictor.predict(
+        point_coords=None,
+        point_labels=None,
+        box=input_boxes,
+        multimask_output=False,
+    )
 # convert the mask shape to (n, H, W)
 if masks.ndim == 4:
     masks = masks.squeeze(1)

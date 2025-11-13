@@ -151,3 +151,5 @@ custom_video_frames
 install.sh
 assets/
 tmp*
+data/*
+bert/*
