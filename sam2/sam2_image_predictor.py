@@ -59,10 +59,18 @@ class SAM2ImagePredictor:
         self.mask_threshold = mask_threshold
 
         # Spatial dim for backbone feature maps
+        # for 1024
+        # self._bb_feat_sizes = [
+        #     (256, 256),
+        #     (128, 128),
+        #     (64, 64),
+        # ]
+
+        # for 256
         self._bb_feat_sizes = [
-            (256, 256),
-            (128, 128),
             (64, 64),
+            (32, 32),
+            (16, 16),
         ]
 
     @classmethod
